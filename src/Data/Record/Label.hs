@@ -1,7 +1,7 @@
 module Data.Record.Label
 (
 -- * Lens types.
-  Point (Point)
+  Point (Point,MaybePoint)
 , (:->) (Lens)
 , lens
 , getL, setL, modL
