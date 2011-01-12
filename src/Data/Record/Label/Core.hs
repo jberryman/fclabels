@@ -10,6 +10,8 @@ import Control.Monad.Reader
 data Point f i o = Point 
                        { _get :: f -> o
                        , _set :: i -> f -> f }
+                 -- Multi-constructor types will generate lenses built
+                 -- with this constructor:
                  | MaybePoint
                        { _getSafe :: f -> Maybe o
                        , _setSafe :: i -> f -> Maybe f }
@@ -66,7 +68,6 @@ instance Functor (Point f i) where
   fmap f (MaybePoint g s) = MaybePoint (fmap f . g) s
 
 
--- TODO: THESE NEED TO BE DOUBLE-CHECKED:
 instance Applicative (Point f i) where
   pure a = Point (const a) (const id)
   -- MaybePoint & Point mix in the same manner as in Category above
@@ -103,6 +104,7 @@ instance Category (:<->:) where
 infixr 8 %
 
 instance Iso ((:->) i) where
+  l % Lens (MaybePoint g s) = safeLens (fmap (fw l) . g) (s . bw l)
   l % Lens a = lens (fw l . _get a) (_set a . bw l)
 
 instance Iso ((:<->:) i) where
