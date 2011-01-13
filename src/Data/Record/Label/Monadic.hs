@@ -7,6 +7,34 @@ module Data.Record.Label.Monadic
 )
 where
 
+-- Brandon Simmons, 1/12/2011:
+--- PROPOSED NAME CHANGES:
+--     getsL, putsL, modifiesL, (=:) 
+--   , asksL, localL
+--
+-- These names are better IMHO because:
+--    1) the 'M' at the end of a function usually implies polymorphism 
+--        over the Monad class not MonadState
+--
+--    2) In the same way that (:->) is meant to resemble (->) we can have
+--        State monad functions share similar names:
+--            getsL              <--->    gets 
+--            :: (s :-> a) -> m a         :: (s -> a) -> m a
+--
+--            asksL              <--->    asks
+--            :: (r :-> a) -> m a         :: (r -> a) -> m a
+--        
+--       Furthermore, the proposed name "putsL" mirrors what would be the
+--       "put" equivalent of "gets". Only that function doesn't exist in 
+--       the standard libraries (because it can't be easily defined without
+--       something like 'fclabels'. Likewise for "modifiesL".
+--
+--    3) I would love to use the 'M' suffix for the functions that rely on 
+--        the new MaybePoint constructor, and will have polymorphic Monad
+--        return types.
+--
+
+
 import Control.Monad.State
 import Control.Monad.Reader
 import Data.Record.Label.Core
