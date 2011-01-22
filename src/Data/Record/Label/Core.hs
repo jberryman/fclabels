@@ -17,7 +17,7 @@ data Point f i o = Point
                        , _setSafe :: i -> f -> Maybe f }
 
 -- defined in such a way to be general enough to use in Category instance
--- declaration and in `safeModL`:
+-- declaration and in `modLM`:
 _maybeMod :: Point f i o -> (o -> Maybe i) -> f -> Maybe f
 _maybeMod (MaybePoint g s) f a = flip s a =<< (f =<< g a) 
 _maybeMod p f a                = _maybeMod (_toMaybePoint p) f a
@@ -28,23 +28,22 @@ _mod mp          f a = _mod (_toPoint mp) f a
 
 newtype (f :-> a) = Lens { unLens :: Point f a a }
 
--- | Create a lens out of a simple getter and setter. see also `safeLens`.
+-- | Create a lens out of a simple getter and setter. See also `maybeLens`.
 
 lens :: (f -> a) -> (a -> f -> f) -> f :-> a
 lens g s = Lens (Point g s)
 
--- | Get the getter function from a lens.
+-- | Get a simple getter function from a lens. See also `safeGetL`.
 
 getL :: (f :-> a) -> f -> a
 getL = _get . _toPoint . unLens
 
--- | Get the setter function from a lens.
+-- | Get a simple setter function from a lens. See also `safeSetL`.
 
 setL :: (f :-> a) -> a -> f -> f
 setL = _set . _toPoint . unLens
 
--- | Get a non-failure-handling modifier function from a lens. See also 
--- `safeModL`.
+-- | Get a simple modifier function from a lens. See also `modLM`.
 
 modL :: (f :-> a) -> (a -> a) -> f -> f
 modL = _mod . unLens
@@ -53,13 +52,13 @@ instance Category (:->) where
   id = lens id const
   -- compose two error-handling Point types, threading Maybes
   Lens (MaybePoint g s) . Lens b@(MaybePoint g' s') = 
-        safeLens (\f-> g =<< g' f) (_maybeMod b . s)
+        maybeLens (\f-> g =<< g' f) (_maybeMod b . s)
   -- etc.
   Lens (Point g s) . Lens b@(MaybePoint g' s') = 
-        safeLens (fmap g . g') (\i-> _maybeMod b (return . s i))
+        maybeLens (fmap g . g') (\i-> _maybeMod b (return . s i))
   -- 
   Lens (MaybePoint g s) . Lens b = 
-        safeLens (g . _get b) (_maybeMod b . s)
+        maybeLens (g . _get b) (_maybeMod b . s)
   -- original definition:
   Lens a . Lens b = lens (_get a . _get b) (_mod b . _set a)
 
@@ -82,8 +81,15 @@ instance Applicative (Point f i) where
   -- original definition:
   a <*> b = Point (_get a <*> _get b) (\r -> _set b r . _set a r)
 
+
+-- | Lift a lens into the Applicative class. Failure-handling with the 
+-- MaybePoint type is abandoned. See also `liftML`.
+
 fmapL :: Applicative f => (a :-> b) -> f a :-> f b
-fmapL l = lens (fmap (getL l)) (\x f -> setL l <$> x <*> f)
+fmapL (Lens (Point g s)) = lens (fmap g) (\x f -> s <$> x <*> f)
+fmapL (Lens mp) = fmapL (Lens $ _toPoint mp) -- SEEMS TO BE NO WAY TO WRAP
+                                             -- MAYBE AROUND APPLICATIVE HERE
+ 
 
 -- | This isomorphism type class is like a `Functor' but works in two directions.
 
@@ -104,7 +110,7 @@ instance Category (:<->:) where
 infixr 8 %
 
 instance Iso ((:->) i) where
-  l % Lens (MaybePoint g s) = safeLens (fmap (fw l) . g) (s . bw l)
+  l % Lens (MaybePoint g s) = maybeLens (fmap (fw l) . g) (s . bw l)
   l % Lens a = lens (fw l . _get a) (_set a . bw l)
 
 instance Iso ((:<->:) i) where
@@ -114,7 +120,8 @@ lmap :: Functor f => (a :<->: b) -> f a :<->: f b
 lmap l = let a :<->: b = l in fmap a :<->: fmap b
 
 dimap :: (o' -> o) -> (i -> i') -> Point f i' o' -> Point f i o
-dimap f g l = Point (f . _get l) (_set l . g)
+dimap fo fi (MaybePoint g s) = MaybePoint (fmap fo . g) (s . fi)
+dimap fo fi l = Point (fo . _get l) (_set l . fi)
 
 -- | Combine a partial destructor with a lens into something easily used in the
 -- applicative instance for the hidden `Point' datatype. Internally uses the
@@ -125,6 +132,8 @@ dimap f g l = Point (f . _get l) (_set l . g)
 for :: (i -> o) -> (f :-> o) -> Point f i o
 for a b = dimap id a (unLens b)
 
+ 
+ ------------  Point TYPE AND Maybe CONVERSIONS  --------------
 
 -- Point type conversions, wrapping non-error-catching functions in the Maybe 
 -- type, or discarding Maybe wrappers in the MaybePoint constructor, raising
@@ -144,18 +153,28 @@ _maybeGetErr = _maybeErr "Getter function failed."
 _maybeSetErr = _maybeErr "Setter function failed."
 _maybeErr str = maybe (error str) id
 
+-- lifts Maybe into Monad class:
+_liftMaybe :: (Monad m)=> Maybe a -> m a
+_liftMaybe = maybe (fail "A lens function failed.") return
 
- ------------ NEW SAFE FUNCTIONS (NOT YET EXPORTED) --------------
+
+ ------------  NEW FAILURE-HANDLING-SUPPORTING FUNCTIONS  --------------
 
 -- | Create an error handling lens. Useful for multi-constructor types or 
--- other situations where  a setter or getter might fail.
+-- other situations where a setter or getter might fail.
 
-safeLens :: (f -> Maybe a) -> (a -> f -> Maybe f) -> f :-> a
-safeLens g s = Lens (MaybePoint g s)
+maybeLens :: (f -> Maybe a) -> (a -> f -> Maybe f) -> f :-> a
+maybeLens g s = Lens (MaybePoint g s)
 
 
--- | Get a modifier function from a lens that catches errors of lens 
--- composition in the Maybe type.
 
-safeModL :: (f :-> a) -> (a -> a) -> f -> Maybe f
-safeModL l m = _maybeMod (unLens l) (return . m)
+ ------------ MISCELLENEOUS / DEMO FUNCTIONS --------------
+
+-- | Given a predicate and a lens, returns a new lens that uses MaybePoint
+-- internally. When used with the monadic setter and getter functions, the
+-- operation will fail if the predicate is not satisfied. When used with 
+-- `getL` and `setL` an error will be raised if the predicate returns False.
+
+--validateWith :: (b -> Bool) -> (a :-> b) -> (a :-> b)
+--validateWith p l = undefined --todo later
+
