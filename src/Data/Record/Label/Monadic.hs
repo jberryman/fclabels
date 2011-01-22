@@ -1,16 +1,21 @@
 {-# LANGUAGE TypeOperators, TypeSynonymInstances, TemplateHaskell #-}
 module Data.Record.Label.Monadic
 (
--- * Monadic lens operations.
-  getM, setM, modM, (=:)
+-- * Failure-handling monadic operations.
+-- ...
+-- * State and Reader Monad lens operations.
+  getsL, putsL, modifiesL, (=:) 
+, asksL, localL
+-- ** Deprecated names for compatibility
+, getM, setM, modM
 , askM, localM
 )
 where
 
 -- Brandon Simmons, 1/12/2011:
---- PROPOSED NAME CHANGES:
---     getsL, putsL, modifiesL, (=:) 
---   , asksL, localL
+--- NOTES ON STATE/READER FUNCTION NAME CHANGES:
+--        getsL, putsL, modifiesL, (=:) 
+--      , asksL, localL
 --
 -- These names are better IMHO because:
 --    1) the 'M' at the end of a function usually implies polymorphism 
@@ -41,34 +46,88 @@ import Data.Record.Label.Core
 
 -- | Get a value out of state pointed to by the specified lens.
 
-getM :: MonadState s m => s :-> b -> m b
-getM = gets . getL
+getsL :: MonadState s m => s :-> b -> m b
+getsL = gets . getL
 
 -- | Set a value somewhere in state pointed to by the specified lens.
 
-setM :: MonadState s m => s :-> b -> b -> m ()
-setM l = modify . setL l
+putsL :: MonadState s m => s :-> b -> b -> m ()
+putsL l = modify . setL l
 
--- | Alias for `setM' that reads like an assignment.
+-- | Alias for `putsL' that reads like an assignment.
 
 infixr 7 =:
 (=:) :: MonadState s m => s :-> b -> b -> m ()
-(=:) = setM
+(=:) = putsL
 
 -- | Modify a value with a function somewhere in state pointed to by the
 -- specified lens.
 
-modM :: MonadState s m => s :-> b -> (b -> b) -> m ()
-modM l = modify . modL l
+modifiesL :: MonadState s m => s :-> b -> (b -> b) -> m ()
+modifiesL l = modify . modL l
 
 -- | Fetch a value pointed to by a lens out of a reader environment.
 
-askM :: MonadReader r m => (r :-> b) -> m b
-askM = asks . getL
+asksL :: MonadReader r m => (r :-> b) -> m b
+asksL = asks . getL
 
 -- | Execute a computation in a modified environment. The lens is used to
 -- point out the part to modify.
 
-localM :: MonadReader r m => (r :-> b) -> (b -> b) -> m a -> m a
-localM l f = local (modL l f)
+localL :: MonadReader r m => (r :-> b) -> (b -> b) -> m a -> m a
+localL l = local . modL l
+ 
+ 
+ ------------ OLD NAMES FOR BACKWORDS COMPATIBILITY? ----------
 
+-- | DEPRECATED. use `getsL`.
+
+getM :: MonadState s m => s :-> b -> m b
+getM = getsL
+
+-- | DEPRECATED. use `putsL`.
+
+setM :: MonadState s m => s :-> b -> b -> m ()
+setM = putsL
+
+-- | DEPRECATED. use `modifiesL`.
+
+modM :: MonadState s m => s :-> b -> (b -> b) -> m ()
+modM = modifiesL
+
+-- | DEPRECATED. use `asksL`.
+
+askM :: MonadReader r m => (r :-> b) -> m b
+askM = asksL
+
+-- | DEPRECATED. use `localL`.
+
+localM :: MonadReader r m => (r :-> b) -> (b -> b) -> m a -> m a
+localM = localL
+
+
+{-
+ ------------ FAILURE-HANDLING MONADIC FUNCTIONS --------------
+
+---- These functions can be used to catch errors such as occur when using
+---- a lens on the wrong constructor of a multi-constructor type. Currently 
+---- we return results in polymorphic Monad class, rather than just Maybe,
+---- because:
+--       1) it is more general and possibly useful
+--       2) it mirrors the liftML function (sister to fmapL but supporting 
+--           our failure-handling functions) 
+
+-- | Get a modifier function from a lens that returns its value in a monad.
+-- If a lens function fails we call the monad 'fail' method.
+
+modLM :: (Monad m)=> (f :-> a) -> (a -> a) -> f -> m f
+modLM l m = _liftMaybe . _maybeMod (unLens l) (return . m)
+
+
+-- | Lift a lens into the Monad class. Any failures raised by lenses using the
+-- MaybePoint constructor will call the monad's 'fail' method.
+
+liftML :: Monad m => (a :-> b) -> m a :-> m b
+liftML = undefined
+
+-}
