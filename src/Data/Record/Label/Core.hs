@@ -89,7 +89,11 @@ fmapL :: Applicative f => (a :-> b) -> f a :-> f b
 fmapL (Lens (Point g s)) = lens (fmap g) (\x f -> s <$> x <*> f)
 fmapL (Lens mp) = fmapL (Lens $ _toPoint mp) -- SEEMS TO BE NO WAY TO WRAP
                                              -- MAYBE AROUND APPLICATIVE HERE
- 
+
+--
+-- TODO: CONSIDER MAKING A MONADIC/FAILURE-HANDLING BIDIRECTIONAL FUNCTOR 
+--       CALLED  (:<~>:) 
+--
 
 -- | This isomorphism type class is like a `Functor' but works in two directions.
 
