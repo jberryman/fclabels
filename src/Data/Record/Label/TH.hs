@@ -3,6 +3,23 @@ module Data.Record.Label.TH
 , mkLabelsNoTypes
 ) where
 
+--
+-- TODO: in order to support failure-handling in multi-constructor
+--  types, we should generate lenses as follows:
+--
+--         if (accessor function appears in EVERY constructor)
+--             then (make that lens with the Point constructor)
+--             else (make lens with MaybePoint)
+--
+--  lenses made with MaybePoint will pattern-match each constructor
+--  in the original _accessor as follows:
+--
+--         g (Foo i _)   = Just i
+--         g (Bar i _ _) = Just i
+--         g _           = Nothing
+
+
+
 import Control.Monad
 import Data.Char
 import Data.List (nub)
