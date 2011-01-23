@@ -86,27 +86,22 @@ localL l f m = ask >>= modML l f >>= \r-> local (const r) m
  ------------ OLD NAMES FOR BACKWORDS COMPATIBILITY? ----------
 
 -- | DEPRECATED. use `getsL`.
-
 getM :: MonadState s m => s :-> b -> m b
 getM = getsL
 
 -- | DEPRECATED. use `putsL`.
-
 setM :: MonadState s m => s :-> b -> b -> m ()
 setM = putsL
 
 -- | DEPRECATED. use `modifiesL`.
-
 modM :: MonadState s m => s :-> b -> (b -> b) -> m ()
 modM = modifiesL
 
 -- | DEPRECATED. use `asksL`.
-
 askM :: MonadReader r m => (r :-> b) -> m b
 askM = asksL
 
 -- | DEPRECATED. use `localL`.
-
 localM :: MonadReader r m => (r :-> b) -> (b -> b) -> m a -> m a
 localM = localL
 

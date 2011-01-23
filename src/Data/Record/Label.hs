@@ -3,7 +3,7 @@ module Data.Record.Label
 -- * Lens types.
   Point (Point,MaybePoint)
 , (:->) (Lens)
-, lens
+, lens, maybeLens
 , getL, setL, modL
 
 , fmapL
@@ -15,7 +15,14 @@ module Data.Record.Label
 , for
 
 -- * Monadic lens operations.
-, getM, setM, modM, (=:)
+-- ** Failure-handling monadic operations.
+, getML, setML, modML
+, liftML 
+-- ** State and Reader Monad lens operations.
+, getsL, putsL, modifiesL, (=:) 
+, asksL, localL
+-- *** Deprecated names for compatibility
+, getM, setM, modM
 , askM, localM
 
 -- * Derive labels using Template Haskell.
